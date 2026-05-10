@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./services/api" },
+    { "path": "./services/worker" },
+    { "path": "./services/dispatcher" },
+    { "path": "./tools/mock-backend" }
+  ]
+}

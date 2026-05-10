@@ -1,0 +1,39 @@
+{
+  "name": "whatsapp-service",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Multi-tenant WhatsApp service built on whatsapp-web.js",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "tools/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "tsc -b",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate:up": "node-pg-migrate up -m migrations -j js",
+    "migrate:down": "node-pg-migrate down -m migrations -j js",
+    "migrate:create": "node-pg-migrate create -m migrations -j js",
+    "dev:api": "npm run dev --workspace=@wa/api",
+    "dev:worker": "npm run dev --workspace=@wa/worker",
+    "dev:dispatcher": "npm run dev --workspace=@wa/dispatcher"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "20.14.10",
+    "node-pg-migrate": "7.6.1",
+    "pg": "8.13.1",
+    "testcontainers": "^11.14.0",
+    "tsup": "8.3.5",
+    "typescript": "5.6.3",
+    "vitest": "2.1.8"
+  }
+}

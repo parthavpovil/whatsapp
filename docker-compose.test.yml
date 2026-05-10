@@ -1,0 +1,98 @@
+version: "3.9"
+
+# Lightweight test stack — api + dispatcher + mock-backend only.
+# Worker is excluded (requires real WhatsApp/Chromium).
+# Run: docker compose -f docker-compose.test.yml up -d --build
+#      Then set TEST_DATABASE_URL / TEST_REDIS_URL and run: npm test
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: wa_service
+      POSTGRES_USER: wa
+      POSTGRES_PASSWORD: wa_test_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wa -d wa_service"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: build
+    working_dir: /app
+    command: node node_modules/.bin/node-pg-migrate up -m migrations -j js
+    environment:
+      DATABASE_URL: postgres://wa:wa_test_password@postgres:5432/wa_service
+    volumes:
+      - ./migrations:/app/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  whatsapp-api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://wa:wa_test_password@postgres:5432/wa_service
+      REDIS_URL: redis://redis:6379
+      PORT: 8080
+      BACKEND_TO_WA_SHARED_SECRET: test-secret-must-be-32-bytes-xxx
+      LOG_LEVEL: info
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8080/health',r=>process.exit(r.statusCode===200?0:1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  mock-backend:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    command: npx -y tsx tools/mock-backend/src/main.ts
+    environment:
+      MOCK_BACKEND_PORT: 9000
+      MOCK_BACKEND_MODE: ok
+      MOCK_WEBHOOK_SECRET: test-webhook-secret-32-bytes-here
+    volumes:
+      - .:/app
+    ports: ["9000:9000"]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:9000/events',r=>process.exit(r.statusCode===200?0:1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  whatsapp-dispatcher:
+    build:
+      context: .
+      dockerfile: services/dispatcher/Dockerfile
+    environment:
+      DATABASE_URL: postgres://wa:wa_test_password@postgres:5432/wa_service
+      REDIS_URL: redis://redis:6379
+      DISPATCHER_CONCURRENCY: 2
+      DISPATCHER_HTTP_TIMEOUT_MS: 5000
+      LOG_LEVEL: info
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mock-backend:
+        condition: service_healthy
