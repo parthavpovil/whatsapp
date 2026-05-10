@@ -1,5 +1,5 @@
 import { RedisKeys } from '@wa/shared';
-import type { Redis } from 'ioredis';
+import type { ClientContext, Redis } from 'ioredis';
 
 // Token bucket implemented in Redis Lua. Atomic refill + take.
 //
@@ -53,7 +53,7 @@ return { allowed, math.floor(tokens), retry_ms }
 `;
 
 declare module 'ioredis' {
-  interface RedisCommander<_Context> {
+  interface RedisCommander<Context extends ClientContext> {
     rateLimitTake(
       key: string,
       capacity: string,
