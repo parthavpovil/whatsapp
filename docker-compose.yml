@@ -118,11 +118,14 @@ services:
       dockerfile: services/dispatcher/Dockerfile
     environment:
       DATABASE_URL: postgres://wa:${POSTGRES_PASSWORD:-wa_dev_password}@postgres:5432/wa_service
+      REDIS_URL: redis://redis:6379
       DISPATCHER_CONCURRENCY: 4
       DISPATCHER_HTTP_TIMEOUT_MS: 10000
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     deploy:
       replicas: 2

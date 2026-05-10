@@ -1,5 +1,5 @@
+import { type QueueMessage, QueueMessageSchema, RedisKeys } from '@wa/shared';
 import type { Redis } from 'ioredis';
-import { QueueMessageSchema, RedisKeys } from '@wa/shared';
 import { log } from './log.js';
 import type { SessionManager } from './session-manager.js';
 
@@ -36,7 +36,7 @@ export class QueueConsumer {
   }
 
   private async handle(raw: string): Promise<void> {
-    let parsed;
+    let parsed: QueueMessage;
     try {
       parsed = QueueMessageSchema.parse(JSON.parse(raw));
     } catch (err) {
@@ -64,15 +64,11 @@ export class QueueConsumer {
     this.stopped = true;
     // Push a sentinel onto the queue so BRPOP unblocks.
     try {
-      await this.opts.brpopClient.lpush(
-        RedisKeys.workerQueue(this.opts.workerId),
-        SENTINEL,
-      );
+      await this.opts.brpopClient.lpush(RedisKeys.workerQueue(this.opts.workerId), SENTINEL);
     } catch {
       // if redis is dead, the consumer will exit on its own when its loop errors
     }
   }
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

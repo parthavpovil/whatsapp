@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EVENT_TYPES, MESSAGE_TYPES } from '../types/status.js';
+import { type EVENT_TYPES, MESSAGE_TYPES } from '../types/status.js';
 
 // Webhook envelope sent from dispatcher → backend.
 const Envelope = <T extends z.ZodTypeAny>(eventType: string, payload: T) =>

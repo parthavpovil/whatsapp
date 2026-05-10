@@ -1,6 +1,6 @@
+import { RedisKeys } from '@wa/shared';
 import type { Redis } from 'ioredis';
 import type pg from 'pg';
-import { RedisKeys } from '@wa/shared';
 
 // Two-stage dedup. First stage is a Redis SETNX (cheap, fast); second stage is
 // a Postgres INSERT ... ON CONFLICT DO NOTHING in the SAME transaction as the

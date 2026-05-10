@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { request } from 'undici';
 import { log } from './log.js';
@@ -65,7 +65,9 @@ export const downloadOutboundMedia = async (
     await body.dump();
     throw new Error(`outbound media fetch failed: http_${statusCode}`);
   }
-  const mimeType = String(headers['content-type'] ?? 'application/octet-stream').split(';')[0] ?? 'application/octet-stream';
+  const mimeType =
+    String(headers['content-type'] ?? 'application/octet-stream').split(';')[0] ??
+    'application/octet-stream';
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of body) {

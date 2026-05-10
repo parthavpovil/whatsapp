@@ -13,14 +13,12 @@ export const dedupCommand = (commandId: string): string => `dedup:command:${comm
 export const dedupEvent = (waAccountId: string, waMessageId: string): string =>
   `dedup:event:${waAccountId}:${waMessageId}`;
 
-export const ratelimitAccount = (waAccountId: string): string =>
-  `ratelimit:account:${waAccountId}`;
+export const ratelimitAccount = (waAccountId: string): string => `ratelimit:account:${waAccountId}`;
 
 export const sessionQr = (waAccountId: string): string => `session:qr:${waAccountId}`;
 export const qrChannel = (waAccountId: string): string => `qr:${waAccountId}`;
 
-export const authFailures = (waAccountId: string): string =>
-  `auth_failures:${waAccountId}`;
+export const authFailures = (waAccountId: string): string => `auth_failures:${waAccountId}`;
 
 // TTL constants (seconds) — kept here so we have one place to tune lease windows.
 export const TTL = {

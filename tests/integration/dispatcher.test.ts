@@ -33,7 +33,11 @@ mockBackend.post('/webhooks', async (req, reply) => {
   const sig = String(req.headers['x-wa-signature'] ?? '');
   const ok = verify(rawBody, sig, WEBHOOK_SECRET);
   let parsed: Record<string, unknown> = {};
-  try { parsed = JSON.parse(rawBody) as Record<string, unknown>; } catch { /* ignore */ }
+  try {
+    parsed = JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    /* ignore */
+  }
   received.push({ body: parsed, signatureOk: ok, respondWith: defaultStatus });
   reply.code(defaultStatus).send({ ok: true });
 });
@@ -41,7 +45,7 @@ mockBackend.post('/webhooks', async (req, reply) => {
 let webhookUrl: string;
 
 beforeAll(async () => {
-  const pgUrl = process.env['TEST_DATABASE_URL']!;
+  const pgUrl = process.env.TEST_DATABASE_URL!;
 
   getDispatcherPool(pgUrl);
 
@@ -116,8 +120,8 @@ describe('dispatcher: basic delivery', () => {
     await waitFor(() => received.length > 0);
 
     expect(received.length).toBe(1);
-    expect(received[0]!.signatureOk).toBe(true);
-    expect((received[0]!.body as { event_id: string }).event_id).toBe(eventId);
+    expect(received[0]?.signatureOk).toBe(true);
+    expect((received[0]?.body as { event_id: string }).event_id).toBe(eventId);
 
     const { rows } = await pgClient.query<{ delivered_at: string | null }>(
       'SELECT delivered_at FROM events_outbox WHERE event_id = $1',
@@ -133,10 +137,11 @@ describe('dispatcher: basic delivery', () => {
     await runPollerBriefly();
     await waitFor(() => received.length > 0);
 
-    const call = received[0]!;
+    const call = received[0];
+    if (!call) throw new Error('expected at least one call');
     expect(call.signatureOk).toBe(true);
-    expect((call.body as Record<string, unknown>)['event_type']).toBe('message.incoming');
-    expect((call.body as Record<string, unknown>)['wa_account_id']).toBe(ACCOUNT_ID);
+    expect((call.body as Record<string, unknown>).event_type).toBe('message.incoming');
+    expect((call.body as Record<string, unknown>).wa_account_id).toBe(ACCOUNT_ID);
   });
 });
 
@@ -166,10 +171,10 @@ describe('dispatcher: non-retriable on 4xx (not 408/429)', () => {
     await runPollerBriefly();
     await waitFor(() => received.length > 0);
 
-    const { rows } = await pgClient.query<{ delivered_at: string | null; last_error: string | null }>(
-      'SELECT delivered_at, last_error FROM events_outbox WHERE event_id = $1',
-      [eventId],
-    );
+    const { rows } = await pgClient.query<{
+      delivered_at: string | null;
+      last_error: string | null;
+    }>('SELECT delivered_at, last_error FROM events_outbox WHERE event_id = $1', [eventId]);
     // Non-retriable: delivered_at is set (closed out), last_error has "non_retriable" prefix.
     expect(rows[0]?.delivered_at).not.toBeNull();
     expect(rows[0]?.last_error).toMatch(/non_retriable/);
@@ -204,7 +209,7 @@ describe('dispatcher: visibility lease prevents double delivery', () => {
 
     // All events should be marked delivered.
     const { rows } = await pgClient.query<{ event_id: string; delivered_at: string | null }>(
-      `SELECT event_id, delivered_at FROM events_outbox WHERE event_id = ANY($1)`,
+      'SELECT event_id, delivered_at FROM events_outbox WHERE event_id = ANY($1)',
       [eventIds],
     );
     for (const row of rows) {

@@ -1,5 +1,5 @@
-import pg from 'pg';
 import { Redis } from 'ioredis';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -20,8 +20,8 @@ let pool: pg.Pool;
 let redis: Redis;
 
 beforeAll(async () => {
-  const pgUrl = process.env['TEST_DATABASE_URL']!;
-  const redisUrl = process.env['TEST_REDIS_URL']!;
+  const pgUrl = process.env.TEST_DATABASE_URL!;
+  const redisUrl = process.env.TEST_REDIS_URL!;
 
   pool = new pg.Pool({ connectionString: pgUrl, max: 5 });
   redis = new Redis(redisUrl);
@@ -132,8 +132,9 @@ describe('inbound dedup: Postgres layer', () => {
     // Run multiple concurrent attempts and verify the atomicity invariant:
     // For every row in seen_wa_messages there is exactly one row in events_outbox.
     const msgId = 'wa-msg-atomicity-test-1';
-    const eventIds = Array.from({ length: 5 }, (_, i) =>
-      `40000000-0000-cafe-0001-${String(i).padStart(12, '0')}`,
+    const eventIds = Array.from(
+      { length: 5 },
+      (_, i) => `40000000-0000-cafe-0001-${String(i).padStart(12, '0')}`,
     );
 
     await Promise.all(
@@ -147,7 +148,7 @@ describe('inbound dedup: Postgres layer', () => {
     expect(Number((seenRows[0] as { cnt: string }).cnt)).toBe(1);
 
     const { rows: outboxRows } = await pool.query(
-      `SELECT COUNT(*) AS cnt FROM events_outbox WHERE wa_account_id = $1 AND event_id = ANY($2)`,
+      'SELECT COUNT(*) AS cnt FROM events_outbox WHERE wa_account_id = $1 AND event_id = ANY($2)',
       [ACCOUNT_ID, eventIds],
     );
     // Exactly one outbox event for this message.

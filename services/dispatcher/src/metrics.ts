@@ -43,7 +43,7 @@ export const startMetricsServer = (port: number): { close: () => void; stop: () 
     while (!stopped) {
       try {
         const r = await query<{ c: string }>(
-          `SELECT count(*)::text AS c FROM events_outbox WHERE delivered_at IS NULL`,
+          'SELECT count(*)::text AS c FROM events_outbox WHERE delivered_at IS NULL',
         );
         outboxPendingCount.set(Number.parseInt(r.rows[0]?.c ?? '0', 10));
       } catch (err) {

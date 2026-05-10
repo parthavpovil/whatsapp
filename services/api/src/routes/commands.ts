@@ -1,5 +1,5 @@
-import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import { OutboundCommandSchema, RedisKeys } from '@wa/shared';
+import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import { query } from '../db.js';
 import { log } from '../log.js';
 import { commandsReceivedTotal } from '../metrics.js';
@@ -64,7 +64,7 @@ export const registerCommands = (
 
     // Look up the account + worker assignment.
     const acct = await query<WaAccountRow>(
-      `SELECT status, worker_id, lease_expires_at FROM wa_accounts WHERE id = $1`,
+      'SELECT status, worker_id, lease_expires_at FROM wa_accounts WHERE id = $1',
       [cmd.wa_account_id],
     );
     const account = acct.rows[0];

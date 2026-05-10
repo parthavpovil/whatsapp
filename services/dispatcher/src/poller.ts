@@ -51,17 +51,10 @@ const claimBatch = async (): Promise<ClaimedRow[]> => {
 };
 
 const markDelivered = async (eventId: string): Promise<void> => {
-  await query(
-    `UPDATE events_outbox SET delivered_at = now() WHERE event_id = $1`,
-    [eventId],
-  );
+  await query('UPDATE events_outbox SET delivered_at = now() WHERE event_id = $1', [eventId]);
 };
 
-const markRetriable = async (
-  eventId: string,
-  attempts: number,
-  error: string,
-): Promise<void> => {
+const markRetriable = async (eventId: string, attempts: number, error: string): Promise<void> => {
   const next = backoffSeconds(attempts + 1);
   await query(
     `UPDATE events_outbox
@@ -88,10 +81,7 @@ export type PollerOpts = {
   idleSleepMs?: number;
 };
 
-export const runPoller = async (
-  opts: PollerOpts,
-  isStopped: () => boolean,
-): Promise<void> => {
+export const runPoller = async (opts: PollerOpts, isStopped: () => boolean): Promise<void> => {
   const idleSleep = opts.idleSleepMs ?? 1_000;
   while (!isStopped()) {
     let claimed: ClaimedRow[] = [];
@@ -124,10 +114,7 @@ export const runPoller = async (
         if (outcome.kind === 'delivered') {
           await markDelivered(event.event_id);
           webhookDeliveryAttemptsTotal.inc({ outcome: 'delivered' });
-          log.info(
-            { event_id: event.event_id, event_type: event.event_type },
-            'delivered',
-          );
+          log.info({ event_id: event.event_id, event_type: event.event_type }, 'delivered');
         } else if (outcome.kind === 'non_retriable') {
           await markNonRetriable(event.event_id, outcome.error);
           webhookDeliveryAttemptsTotal.inc({ outcome: 'non_retriable' });
@@ -148,5 +135,4 @@ export const runPoller = async (
   }
 };
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

@@ -1,5 +1,5 @@
-import type { Redis } from 'ioredis';
 import { RedisKeys, newEventId, sessionQrRequired } from '@wa/shared';
+import type { Redis } from 'ioredis';
 import { query } from '../db.js';
 import { log } from '../log.js';
 import { insertOutbox } from '../outbox.js';
@@ -19,8 +19,11 @@ export const onAuthFailure = async (
   log.warn({ wa_account_id: waAccountId, count, reason }, 'auth_failure');
 
   if (count >= AUTH_FAILURE_THRESHOLD) {
-    log.error({ wa_account_id: waAccountId, count }, 'auth_failure threshold — wiping session blob');
-    await query(`DELETE FROM wa_session_blobs WHERE wa_account_id=$1`, [waAccountId]);
+    log.error(
+      { wa_account_id: waAccountId, count },
+      'auth_failure threshold — wiping session blob',
+    );
+    await query('DELETE FROM wa_session_blobs WHERE wa_account_id=$1', [waAccountId]);
     await query(
       `UPDATE wa_accounts SET status='qr_required', last_qr=NULL, updated_at=now() WHERE id=$1`,
       [waAccountId],

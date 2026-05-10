@@ -1,3 +1,4 @@
+import { uuidv7 } from '@wa/shared';
 // Tiny CLI: send a command to the api directly.
 // Usage:
 //   tsx tools/mock-backend/src/cli.ts \
@@ -7,7 +8,6 @@
 //     --to 5551234567 \
 //     --body "hello"
 import { request } from 'undici';
-import { uuidv7 } from '@wa/shared';
 
 const args = (() => {
   const out: Record<string, string> = {};
@@ -27,14 +27,16 @@ const args = (() => {
   return out;
 })();
 
-const api = args['api'] ?? 'http://localhost:8080';
-const secret = args['secret'] ?? process.env.BACKEND_TO_WA_SHARED_SECRET ?? '';
-const account = args['account'];
-const to = args['to'];
-const body = args['body'] ?? 'hello from mock-backend';
+const api = args.api ?? 'http://localhost:8080';
+const secret = args.secret ?? process.env.BACKEND_TO_WA_SHARED_SECRET ?? '';
+const account = args.account;
+const to = args.to;
+const body = args.body ?? 'hello from mock-backend';
 
 if (!secret || !account || !to) {
-  console.error('usage: cli --account <id> --to <phone> [--body <text>] [--api <url>] [--secret <token>]');
+  console.error(
+    'usage: cli --account <id> --to <phone> [--body <text>] [--api <url>] [--secret <token>]',
+  );
   process.exit(2);
 }
 

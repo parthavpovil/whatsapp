@@ -3,11 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "Multi-tenant WhatsApp service built on whatsapp-web.js",
-  "workspaces": [
-    "packages/*",
-    "services/*",
-    "tools/*"
-  ],
+  "workspaces": ["packages/*", "services/*", "tools/*"],
   "engines": {
     "node": ">=20.0.0"
   },

@@ -14,15 +14,15 @@ export const registerHealth = (app: FastifyInstance, redis: Redis): void => {
     const checks: Record<string, string> = {};
     try {
       await query('SELECT 1');
-      checks['postgres'] = 'ok';
+      checks.postgres = 'ok';
     } catch (err) {
-      checks['postgres'] = err instanceof Error ? err.message : 'error';
+      checks.postgres = err instanceof Error ? err.message : 'error';
     }
     try {
       const pong = await redis.ping();
-      checks['redis'] = pong === 'PONG' ? 'ok' : `unexpected:${pong}`;
+      checks.redis = pong === 'PONG' ? 'ok' : `unexpected:${pong}`;
     } catch (err) {
-      checks['redis'] = err instanceof Error ? err.message : 'error';
+      checks.redis = err instanceof Error ? err.message : 'error';
     }
     const ok = Object.values(checks).every((v) => v === 'ok');
     reply.code(ok ? 200 : 503).send({ status: ok ? 'ready' : 'not_ready', checks });

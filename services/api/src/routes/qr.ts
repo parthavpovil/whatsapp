@@ -1,6 +1,6 @@
+import { RedisKeys } from '@wa/shared';
 import type { FastifyInstance, FastifyReply, preHandlerAsyncHookHandler } from 'fastify';
 import type { Redis } from 'ioredis';
-import { RedisKeys } from '@wa/shared';
 import { log } from '../log.js';
 
 const SSE_PING_INTERVAL_MS = 15_000;
@@ -35,7 +35,11 @@ export const registerQr = (
   );
 };
 
-const streamQrSse = async (reply: FastifyReply, redis: Redis, waAccountId: string): Promise<void> => {
+const streamQrSse = async (
+  reply: FastifyReply,
+  redis: Redis,
+  waAccountId: string,
+): Promise<void> => {
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
@@ -94,7 +98,11 @@ const streamQrSse = async (reply: FastifyReply, redis: Redis, waAccountId: strin
   }
 };
 
-const longPollQr = async (reply: FastifyReply, redis: Redis, waAccountId: string): Promise<void> => {
+const longPollQr = async (
+  reply: FastifyReply,
+  redis: Redis,
+  waAccountId: string,
+): Promise<void> => {
   const deadline = Date.now() + LONG_POLL_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const cached = await redis.get(RedisKeys.sessionQr(waAccountId));

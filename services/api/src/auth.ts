@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-export const makeBearerAuth = (sharedSecret: string) =>
+export const makeBearerAuth =
+  (sharedSecret: string) =>
   async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     const header = req.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) {

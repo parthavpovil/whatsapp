@@ -160,8 +160,7 @@ const main = async (): Promise<void> => {
   log.info('worker: ready');
 };
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 void main().catch((err) => {
   log.error({ err }, 'worker: fatal during startup');

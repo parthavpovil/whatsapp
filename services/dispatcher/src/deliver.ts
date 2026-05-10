@@ -1,5 +1,5 @@
-import { Agent, request } from 'undici';
 import { sign } from '@wa/shared';
+import { Agent, request } from 'undici';
 import { log } from './log.js';
 
 export type DeliveryEvent = {

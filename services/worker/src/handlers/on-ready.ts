@@ -1,5 +1,5 @@
-import type { Redis } from 'ioredis';
 import { RedisKeys, newEventId, sessionConnected } from '@wa/shared';
+import type { Redis } from 'ioredis';
 import { query } from '../db.js';
 import { log } from '../log.js';
 import { insertOutbox } from '../outbox.js';

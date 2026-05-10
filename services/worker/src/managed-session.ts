@@ -1,17 +1,17 @@
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { type OutboundCommand, messageSendFailed, messageSentAck, newEventId } from '@wa/shared';
 import type { Redis } from 'ioredis';
 import wwebjs from 'whatsapp-web.js';
-import { type OutboundCommand, messageSendFailed, messageSentAck, newEventId } from '@wa/shared';
 import { withTx } from './db.js';
-import { log } from './log.js';
 import { onAuthFailure } from './handlers/on-auth-failure.js';
 import { onAuthenticated } from './handlers/on-authenticated.js';
 import { onDisconnected } from './handlers/on-disconnected.js';
-import { onMessage } from './handlers/on-message.js';
 import { onMessageAck } from './handlers/on-message-ack.js';
+import { onMessage } from './handlers/on-message.js';
 import { onQr } from './handlers/on-qr.js';
 import { onReady } from './handlers/on-ready.js';
+import { log } from './log.js';
 import { type MediaConfig, downloadOutboundMedia } from './media.js';
 import { messagesFailedTotal, messagesSentTotal } from './metrics.js';
 import { insertOutboxTx } from './outbox.js';
@@ -82,9 +82,7 @@ export class ManagedSession {
     });
     this.client.on('ready', () => {
       const phone = this.client.info?.wid?.user ?? '';
-      void onReady(this.redis, id, phone).catch((err) =>
-        log.error({ err, id }, 'on-ready failed'),
-      );
+      void onReady(this.redis, id, phone).catch((err) => log.error({ err, id }, 'on-ready failed'));
     });
     this.client.on('disconnected', (reason: string) => {
       void onDisconnected(id, reason).catch((err) =>
@@ -148,20 +146,22 @@ export class ManagedSession {
     });
 
     try {
-      const sent = cmd.type === 'text'
-        ? await this.client.sendMessage(cmd.to, cmd.payload.body)
-        : await (async () => {
-            const fetched = await downloadOutboundMedia(this.media, cmd.payload.media_url);
-            const filename = cmd.payload.filename ?? `media.${cmd.payload.mime_type.split('/')[1] ?? 'bin'}`;
-            const media = new MessageMedia(
-              cmd.payload.mime_type,
-              fetched.data.toString('base64'),
-              filename,
-            );
-            const opts: { caption?: string } = {};
-            if (cmd.payload.body !== undefined) opts.caption = cmd.payload.body;
-            return this.client.sendMessage(cmd.to, media, opts);
-          })();
+      const sent =
+        cmd.type === 'text'
+          ? await this.client.sendMessage(cmd.to, cmd.payload.body)
+          : await (async () => {
+              const fetched = await downloadOutboundMedia(this.media, cmd.payload.media_url);
+              const filename =
+                cmd.payload.filename ?? `media.${cmd.payload.mime_type.split('/')[1] ?? 'bin'}`;
+              const media = new MessageMedia(
+                cmd.payload.mime_type,
+                fetched.data.toString('base64'),
+                filename,
+              );
+              const opts: { caption?: string } = {};
+              if (cmd.payload.body !== undefined) opts.caption = cmd.payload.body;
+              return this.client.sendMessage(cmd.to, media, opts);
+            })();
       const waMessageId = sent.id._serialized;
       await withTx(async (client) => {
         await client.query(
@@ -170,13 +170,16 @@ export class ManagedSession {
             WHERE command_id=$1`,
           [cmd.command_id, waMessageId],
         );
-        await insertOutboxTx(client, messageSentAck({
-          event_id: newEventId(),
-          wa_account_id: accountId,
-          command_id: cmd.command_id,
-          wa_message_id: waMessageId,
-          to: cmd.to,
-        }));
+        await insertOutboxTx(
+          client,
+          messageSentAck({
+            event_id: newEventId(),
+            wa_account_id: accountId,
+            command_id: cmd.command_id,
+            wa_message_id: waMessageId,
+            to: cmd.to,
+          }),
+        );
       });
       messagesSentTotal.inc({ type: cmd.type });
       log.info({ command_id: cmd.command_id, wa_message_id: waMessageId }, 'sent');
@@ -193,13 +196,16 @@ export class ManagedSession {
           [cmd.command_id, errMsg],
         );
         const attempts = result.rows[0]?.attempts ?? 1;
-        await insertOutboxTx(client, messageSendFailed({
-          event_id: newEventId(),
-          wa_account_id: accountId,
-          command_id: cmd.command_id,
-          error: errMsg,
-          attempts,
-        }));
+        await insertOutboxTx(
+          client,
+          messageSendFailed({
+            event_id: newEventId(),
+            wa_account_id: accountId,
+            command_id: cmd.command_id,
+            error: errMsg,
+            attempts,
+          }),
+        );
       });
       throw err;
     }

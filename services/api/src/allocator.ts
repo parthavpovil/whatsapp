@@ -1,5 +1,5 @@
-import type { Redis } from 'ioredis';
 import { RedisKeys } from '@wa/shared';
+import type { Redis } from 'ioredis';
 import { query } from './db.js';
 import { log } from './log.js';
 import { leaseTakeoversTotal } from './metrics.js';
@@ -38,7 +38,7 @@ type UnassignedRow = { id: string };
 const oneTick = async (redis: Redis): Promise<void> => {
   // pg_try_advisory_lock returns false if another api replica holds it; skip this tick.
   const lockResult = await query<{ acquired: boolean }>(
-    `SELECT pg_try_advisory_lock(hashtext($1)) AS acquired`,
+    'SELECT pg_try_advisory_lock(hashtext($1)) AS acquired',
     [ADVISORY_LOCK_KEY],
   );
   const acquired = lockResult.rows[0]?.acquired === true;
@@ -81,7 +81,9 @@ const oneTick = async (redis: Redis): Promise<void> => {
       }
     }
   } finally {
-    await query(`SELECT pg_advisory_unlock(hashtext($1))`, [ADVISORY_LOCK_KEY]).catch(() => undefined);
+    await query('SELECT pg_advisory_unlock(hashtext($1))', [ADVISORY_LOCK_KEY]).catch(
+      () => undefined,
+    );
   }
 };
 

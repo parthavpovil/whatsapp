@@ -23,7 +23,12 @@ export const makeApp = (opts: MakeAppOpts): FastifyInstance => {
     logger: {
       level: opts.logLevel ?? 'warn',
       ...(opts.nodeEnv !== 'production' && opts.logLevel !== 'silent'
-        ? { transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:HH:MM:ss.l' } } }
+        ? {
+            transport: {
+              target: 'pino-pretty',
+              options: { colorize: true, translateTime: 'SYS:HH:MM:ss.l' },
+            },
+          }
         : {}),
       base: { service: 'api' },
     },

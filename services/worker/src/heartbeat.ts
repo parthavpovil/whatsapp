@@ -1,5 +1,5 @@
-import type { Redis } from 'ioredis';
 import { RedisKeys } from '@wa/shared';
+import type { Redis } from 'ioredis';
 
 export const writeHeartbeat = async (
   redis: Redis,

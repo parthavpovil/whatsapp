@@ -47,7 +47,9 @@ export type DispatcherEnv = z.infer<typeof DispatcherEnvSchema>;
 export const loadEnv = <T extends z.ZodTypeAny>(schema: T, source = process.env): z.infer<T> => {
   const parsed = schema.safeParse(source);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
+    const issues = parsed.error.issues
+      .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
     throw new Error(`Invalid environment:\n${issues}`);
   }
   return parsed.data;

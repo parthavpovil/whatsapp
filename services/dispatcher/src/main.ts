@@ -44,8 +44,7 @@ const main = async (): Promise<void> => {
   await Promise.all(runners);
 };
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 void main().catch((err) => {
   log.error({ err }, 'dispatcher: fatal during startup');

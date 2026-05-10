@@ -1,5 +1,5 @@
-import type { Redis } from 'ioredis';
 import { messageIncoming, newEventId } from '@wa/shared';
+import type { Redis } from 'ioredis';
 import { withTx } from '../db.js';
 import { dedupPgTx, dedupRedis } from '../dedup.js';
 import { log } from '../log.js';
@@ -65,10 +65,16 @@ export const onMessage = async (
         });
         mediaMime = downloaded.mimetype;
       } else {
-        log.warn({ wa_account_id: waAccountId, wa_message_id: waMessageId }, 'inbound: downloadMedia returned null');
+        log.warn(
+          { wa_account_id: waAccountId, wa_message_id: waMessageId },
+          'inbound: downloadMedia returned null',
+        );
       }
     } catch (err) {
-      log.error({ err, wa_account_id: waAccountId, wa_message_id: waMessageId }, 'inbound media upload failed');
+      log.error(
+        { err, wa_account_id: waAccountId, wa_message_id: waMessageId },
+        'inbound media upload failed',
+      );
     }
   }
 
@@ -98,7 +104,13 @@ export const onMessage = async (
   });
   messagesIncomingTotal.inc();
   log.info(
-    { wa_account_id: waAccountId, wa_message_id: waMessageId, type: msg.type, from: msg.from, has_media: Boolean(mediaUrl) },
+    {
+      wa_account_id: waAccountId,
+      wa_message_id: waMessageId,
+      type: msg.type,
+      from: msg.from,
+      has_media: Boolean(mediaUrl),
+    },
     'inbound queued',
   );
 };

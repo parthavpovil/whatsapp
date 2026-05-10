@@ -1,5 +1,5 @@
-import Fastify from 'fastify';
 import { verify } from '@wa/shared';
+import Fastify from 'fastify';
 
 type Mode = 'ok' | '500' | 'slow' | 'non_retriable' | 'flaky';
 
@@ -25,7 +25,10 @@ const events: StoredEvent[] = [];
 const main = async (): Promise<void> => {
   const app = Fastify({
     logger: {
-      transport: { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:HH:MM:ss.l' } },
+      transport: {
+        target: 'pino-pretty',
+        options: { colorize: true, translateTime: 'SYS:HH:MM:ss.l' },
+      },
       base: { service: 'mock-backend' },
     },
   });
@@ -47,15 +50,15 @@ const main = async (): Promise<void> => {
     }
     events.push({
       received_at: new Date().toISOString(),
-      event_id: String(parsed['event_id'] ?? ''),
-      event_type: String(parsed['event_type'] ?? ''),
-      wa_account_id: String(parsed['wa_account_id'] ?? ''),
-      workspace_id: String(parsed['workspace_id'] ?? ''),
-      payload: parsed['payload'],
+      event_id: String(parsed.event_id ?? ''),
+      event_type: String(parsed.event_type ?? ''),
+      wa_account_id: String(parsed.wa_account_id ?? ''),
+      workspace_id: String(parsed.workspace_id ?? ''),
+      payload: parsed.payload,
       signature_ok: ok,
     });
     req.log.info(
-      { event_id: parsed['event_id'], event_type: parsed['event_type'], signature_ok: ok },
+      { event_id: parsed.event_id, event_type: parsed.event_type, signature_ok: ok },
       'webhook received',
     );
 
@@ -84,9 +87,10 @@ const main = async (): Promise<void> => {
   });
 
   app.get('/events', async (req) => {
-    const since = req.query && typeof req.query === 'object' && 'since' in req.query
-      ? String((req.query as { since?: string }).since ?? '')
-      : '';
+    const since =
+      req.query && typeof req.query === 'object' && 'since' in req.query
+        ? String((req.query as { since?: string }).since ?? '')
+        : '';
     const filtered = since ? events.filter((e) => e.received_at >= since) : events;
     return { count: filtered.length, events: filtered };
   });

@@ -1,9 +1,9 @@
+import type { FastifyInstance } from 'fastify';
 import pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeApp } from '../../services/api/src/app.js';
 import { closePool } from '../../services/api/src/db.js';
 import { closeRedis } from '../../services/api/src/redis.js';
-import type { FastifyInstance } from 'fastify';
 
 const SECRET = 'test-secret-must-be-32-bytes-xxx';
 const WORKSPACE = '00000000-0000-0000-0000-000000000001';
@@ -14,8 +14,8 @@ let app: FastifyInstance;
 let pgClient: pg.Client;
 
 beforeAll(async () => {
-  const pgUrl = process.env['TEST_DATABASE_URL']!;
-  const redisUrl = process.env['TEST_REDIS_URL']!;
+  const pgUrl = process.env.TEST_DATABASE_URL!;
+  const redisUrl = process.env.TEST_REDIS_URL!;
 
   app = makeApp({ databaseUrl: pgUrl, redisUrl, sharedSecret: SECRET, logLevel: 'silent' });
   await app.ready();
@@ -52,8 +52,8 @@ describe('GET /ready', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json() as { status: string; checks: Record<string, string> };
     expect(body.status).toBe('ready');
-    expect(body.checks['postgres']).toBe('ok');
-    expect(body.checks['redis']).toBe('ok');
+    expect(body.checks.postgres).toBe('ok');
+    expect(body.checks.redis).toBe('ok');
   });
 });
 
@@ -81,7 +81,12 @@ describe('POST /accounts', () => {
       method: 'POST',
       url: '/accounts',
       headers: authHeader,
-      payload: { wa_account_id: id, workspace_id: WORKSPACE, webhook_url: WEBHOOK_URL, webhook_secret: WEBHOOK_SECRET },
+      payload: {
+        wa_account_id: id,
+        workspace_id: WORKSPACE,
+        webhook_url: WEBHOOK_URL,
+        webhook_secret: WEBHOOK_SECRET,
+      },
     });
     expect(res.statusCode).toBe(201);
     const body = res.json() as { wa_account_id: string; status: string };
@@ -91,9 +96,19 @@ describe('POST /accounts', () => {
 
   it('returns 409 on duplicate account', async () => {
     const id = '10000000-0000-0000-0000-000000000002';
-    const payload = { wa_account_id: id, workspace_id: WORKSPACE, webhook_url: WEBHOOK_URL, webhook_secret: WEBHOOK_SECRET };
+    const payload = {
+      wa_account_id: id,
+      workspace_id: WORKSPACE,
+      webhook_url: WEBHOOK_URL,
+      webhook_secret: WEBHOOK_SECRET,
+    };
     await app.inject({ method: 'POST', url: '/accounts', headers: authHeader, payload });
-    const res = await app.inject({ method: 'POST', url: '/accounts', headers: authHeader, payload });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/accounts',
+      headers: authHeader,
+      payload,
+    });
     expect(res.statusCode).toBe(409);
     const body = res.json() as { error: string };
     expect(body.error).toBe('exists');
@@ -116,7 +131,12 @@ describe('GET /accounts/:id', () => {
       method: 'POST',
       url: '/accounts',
       headers: authHeader,
-      payload: { wa_account_id: id, workspace_id: WORKSPACE, webhook_url: WEBHOOK_URL, webhook_secret: WEBHOOK_SECRET },
+      payload: {
+        wa_account_id: id,
+        workspace_id: WORKSPACE,
+        webhook_url: WEBHOOK_URL,
+        webhook_secret: WEBHOOK_SECRET,
+      },
     });
     const res = await app.inject({ method: 'GET', url: `/accounts/${id}`, headers: authHeader });
     expect(res.statusCode).toBe(200);
@@ -143,7 +163,12 @@ describe('DELETE /accounts/:id', () => {
       method: 'POST',
       url: '/accounts',
       headers: authHeader,
-      payload: { wa_account_id: id, workspace_id: WORKSPACE, webhook_url: WEBHOOK_URL, webhook_secret: WEBHOOK_SECRET },
+      payload: {
+        wa_account_id: id,
+        workspace_id: WORKSPACE,
+        webhook_url: WEBHOOK_URL,
+        webhook_secret: WEBHOOK_SECRET,
+      },
     });
     const res = await app.inject({ method: 'DELETE', url: `/accounts/${id}`, headers: authHeader });
     expect(res.statusCode).toBe(202);
@@ -171,7 +196,13 @@ describe('POST /commands', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/commands',
-      payload: { command_id: cmdId, wa_account_id: connectedAcctId, to: '15551234567', type: 'text', payload: { body: 'hi' } },
+      payload: {
+        command_id: cmdId,
+        wa_account_id: connectedAcctId,
+        to: '15551234567',
+        type: 'text',
+        payload: { body: 'hi' },
+      },
     });
     expect(res.statusCode).toBe(401);
   });
@@ -258,10 +289,20 @@ describe('POST /commands', () => {
       payload: { body: 'idempotency test' },
     };
 
-    const first = await app.inject({ method: 'POST', url: '/commands', headers: authHeader, payload: body });
+    const first = await app.inject({
+      method: 'POST',
+      url: '/commands',
+      headers: authHeader,
+      payload: body,
+    });
     expect(first.statusCode).toBe(202);
 
-    const second = await app.inject({ method: 'POST', url: '/commands', headers: authHeader, payload: body });
+    const second = await app.inject({
+      method: 'POST',
+      url: '/commands',
+      headers: authHeader,
+      payload: body,
+    });
     expect(second.statusCode).toBe(202);
     expect((second.json() as { command_id: string }).command_id).toBe(body.command_id);
   });

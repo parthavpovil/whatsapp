@@ -28,7 +28,7 @@ export class PostgresStore {
   async sessionExists({ session }: { session: string }): Promise<boolean> {
     const id = toAccountId(session);
     const result = await query<{ exists: boolean }>(
-      `SELECT EXISTS (SELECT 1 FROM wa_session_blobs WHERE wa_account_id = $1) AS exists`,
+      'SELECT EXISTS (SELECT 1 FROM wa_session_blobs WHERE wa_account_id = $1) AS exists',
       [id],
     );
     return result.rows[0]?.exists === true;
@@ -52,7 +52,7 @@ export class PostgresStore {
   async extract({ session, path }: { session: string; path: string }): Promise<void> {
     const id = toAccountId(session);
     const result = await query<{ blob: Buffer }>(
-      `SELECT blob FROM wa_session_blobs WHERE wa_account_id = $1`,
+      'SELECT blob FROM wa_session_blobs WHERE wa_account_id = $1',
       [id],
     );
     const row = result.rows[0];
@@ -65,7 +65,7 @@ export class PostgresStore {
 
   async delete({ session }: { session: string }): Promise<void> {
     const id = toAccountId(session);
-    await query(`DELETE FROM wa_session_blobs WHERE wa_account_id = $1`, [id]);
+    await query('DELETE FROM wa_session_blobs WHERE wa_account_id = $1', [id]);
     log.info({ wa_account_id: id }, 'session blob deleted');
   }
 }

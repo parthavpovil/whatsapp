@@ -1,4 +1,4 @@
-import { newEventId, messageDelivered, messageRead } from '@wa/shared';
+import { messageDelivered, messageRead, newEventId } from '@wa/shared';
 import { log } from '../log.js';
 import { insertOutbox } from '../outbox.js';
 
@@ -16,13 +16,25 @@ export const onMessageAck = async (
   const at = new Date().toISOString();
   if (ackLevel === 2) {
     await insertOutbox(
-      messageDelivered({ event_id: newEventId(), wa_account_id: waAccountId, wa_message_id: waMessageId, to, at }),
+      messageDelivered({
+        event_id: newEventId(),
+        wa_account_id: waAccountId,
+        wa_message_id: waMessageId,
+        to,
+        at,
+      }),
     );
     return;
   }
   if (ackLevel === 3 || ackLevel === 4) {
     await insertOutbox(
-      messageRead({ event_id: newEventId(), wa_account_id: waAccountId, wa_message_id: waMessageId, to, at }),
+      messageRead({
+        event_id: newEventId(),
+        wa_account_id: waAccountId,
+        wa_message_id: waMessageId,
+        to,
+        at,
+      }),
     );
     return;
   }

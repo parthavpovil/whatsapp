@@ -15,7 +15,8 @@ exports.up = (pgm) => {
     updated_at: { type: 'timestamptz', notNull: true, default: pgm.func('now()') },
   });
   pgm.addConstraint('wa_accounts', 'wa_accounts_status_check', {
-    check: "status IN ('pending','qr_required','authenticated','connected','disconnected','banned')",
+    check:
+      "status IN ('pending','qr_required','authenticated','connected','disconnected','banned')",
   });
   pgm.createIndex('wa_accounts', 'worker_id', {
     name: 'wa_accounts_worker_id_idx',

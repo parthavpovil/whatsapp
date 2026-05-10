@@ -1,5 +1,5 @@
-import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import { CreateAccountSchema } from '@wa/shared';
+import type { FastifyInstance, preHandlerAsyncHookHandler } from 'fastify';
 import { query } from '../db.js';
 import { log } from '../log.js';
 import { accountsCreatedTotal } from '../metrics.js';
