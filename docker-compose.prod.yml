@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: wa_service
+      POSTGRES_USER: wa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wa -d wa_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: node:20-alpine
+    working_dir: /app
+    command: >
+      sh -c "npm install --no-save node-pg-migrate@7.6.1 pg@8 &&
+             node node_modules/.bin/node-pg-migrate up -m migrations -j js"
+    environment:
+      DATABASE_URL: postgres://wa:${POSTGRES_PASSWORD}@postgres:5432/wa_service
+    volumes:
+      - ./migrations:/app/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - migrate
+
+  whatsapp-api:
+    image: wa-api:latest
+    container_name: whatsapp-api
+    environment:
+      DATABASE_URL: postgres://wa:${POSTGRES_PASSWORD}@postgres:5432/wa_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      PORT: 8080
+      BACKEND_TO_WA_SHARED_SECRET: ${BACKEND_TO_WA_SHARED_SECRET}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  whatsapp-worker:
+    image: wa-worker:latest
+    environment:
+      DATABASE_URL: postgres://wa:${POSTGRES_PASSWORD}@postgres:5432/wa_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      WORKER_ID: ${HOSTNAME:-worker-1}
+      MAX_SESSIONS: ${MAX_SESSIONS:-10}
+      MAX_RSS_MB: ${MAX_RSS_MB:-4000}
+      WWEBJS_CACHE_DIR: /data/wwebjs
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_FORCE_PATH_STYLE: "false"
+      OUTBOUND_MEDIA_ALLOWED_HOSTS: ${OUTBOUND_MEDIA_ALLOWED_HOSTS:-localhost}
+      OUTBOUND_MEDIA_MAX_BYTES: ${OUTBOUND_MEDIA_MAX_BYTES:-16000000}
+      RATELIMIT_CAPACITY: ${RATELIMIT_CAPACITY:-10}
+      RATELIMIT_REFILL_PER_SEC: ${RATELIMIT_REFILL_PER_SEC:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - worker_data:/data/wwebjs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  whatsapp-dispatcher:
+    image: wa-dispatcher:latest
+    environment:
+      DATABASE_URL: postgres://wa:${POSTGRES_PASSWORD}@postgres:5432/wa_service
+      DISPATCHER_CONCURRENCY: ${DISPATCHER_CONCURRENCY:-4}
+      DISPATCHER_HTTP_TIMEOUT_MS: ${DISPATCHER_HTTP_TIMEOUT_MS:-10000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  worker_data:

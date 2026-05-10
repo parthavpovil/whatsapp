@@ -1,12 +1,25 @@
-name: ci
+name: CI / Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to deploy (leave empty for latest)'
+        required: false
+        type: string
+
+env:
+  DEPLOY_PATH: /var/www/whatsapp
 
 jobs:
   lint-typecheck-test:
+    name: Lint, Typecheck & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,3 +37,324 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm run test
+
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images
+        run: |
+          COMMIT_SHA=${{ inputs.commit_sha || github.sha }}
+          SHORT_SHA=${COMMIT_SHA:0:7}
+
+          docker build -f services/api/Dockerfile \
+            -t wa-api:${SHORT_SHA} -t wa-api:latest \
+            --build-arg COMMIT_SHA=${COMMIT_SHA} .
+
+          docker build -f services/worker/Dockerfile \
+            -t wa-worker:${SHORT_SHA} -t wa-worker:latest \
+            --build-arg COMMIT_SHA=${COMMIT_SHA} .
+
+          docker build -f services/dispatcher/Dockerfile \
+            -t wa-dispatcher:${SHORT_SHA} -t wa-dispatcher:latest \
+            --build-arg COMMIT_SHA=${COMMIT_SHA} .
+
+          docker save \
+            wa-api:${SHORT_SHA} \
+            wa-worker:${SHORT_SHA} \
+            wa-dispatcher:${SHORT_SHA} \
+            | gzip > /tmp/docker-images.tar.gz
+
+      - name: Upload Docker images artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp/docker-images.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+      url: https://wa.parthavpovil.in
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha || github.sha }}
+
+      - name: Download Docker images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Install sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Transfer Docker images to VPS
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp \
+            -o StrictHostKeyChecking=no \
+            /tmp/docker-images.tar.gz \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/
+
+      - name: Transfer deployment files
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp \
+            -o StrictHostKeyChecking=no \
+            docker-compose.prod.yml \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/wa-docker-compose.prod.yml
+
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp \
+            -o StrictHostKeyChecking=no \
+            -r migrations \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/wa-migrations
+
+      - name: Create deployment script
+        run: |
+          cat > /tmp/deploy.sh << 'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -e
+
+          DEPLOY_PATH="${{ env.DEPLOY_PATH }}"
+          COMMIT_SHA="${{ inputs.commit_sha || github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+
+          echo "=========================================="
+          echo "WhatsApp Service Deployment"
+          echo "Commit: ${COMMIT_SHA}"
+          echo "Time: $(date)"
+          echo "=========================================="
+
+          # Create deployment directory
+          sudo mkdir -p ${DEPLOY_PATH}
+          sudo chown ${{ secrets.VPS_USER }}:${{ secrets.VPS_USER }} ${DEPLOY_PATH}
+
+          # Load Docker images
+          echo "Loading Docker images..."
+          gunzip -c /tmp/docker-images.tar.gz | docker load
+
+          # Tag as latest
+          docker tag wa-api:${SHORT_SHA} wa-api:latest
+          docker tag wa-worker:${SHORT_SHA} wa-worker:latest
+          docker tag wa-dispatcher:${SHORT_SHA} wa-dispatcher:latest
+
+          # Move deployment files
+          sudo cp /tmp/wa-docker-compose.prod.yml ${DEPLOY_PATH}/docker-compose.prod.yml
+          sudo cp -r /tmp/wa-migrations ${DEPLOY_PATH}/migrations
+          sudo chown -R ${{ secrets.VPS_USER }}:${{ secrets.VPS_USER }} ${DEPLOY_PATH}/migrations
+
+          # Write .env
+          cat > ${DEPLOY_PATH}/.env << 'ENV_FILE'
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          BACKEND_TO_WA_SHARED_SECRET=${{ secrets.BACKEND_TO_WA_SHARED_SECRET }}
+
+          S3_ENDPOINT=${{ secrets.S3_ENDPOINT }}
+          S3_REGION=auto
+          S3_ACCESS_KEY_ID=${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET=${{ secrets.S3_BUCKET }}
+
+          MAX_SESSIONS=${{ secrets.MAX_SESSIONS }}
+          MAX_RSS_MB=${{ secrets.MAX_RSS_MB }}
+
+          LOG_LEVEL=info
+          COMMIT_SHA=${COMMIT_SHA}
+          ENV_FILE
+
+          chmod 600 ${DEPLOY_PATH}/.env
+
+          cd ${DEPLOY_PATH}
+
+          # Start infra services if not running
+          echo "Starting infrastructure services..."
+          docker compose -f docker-compose.prod.yml up -d postgres redis
+
+          # Wait for postgres to be healthy
+          echo "Waiting for postgres..."
+          for i in {1..30}; do
+            if docker compose -f docker-compose.prod.yml exec -T postgres pg_isready -U wa -d wa_service > /dev/null 2>&1; then
+              echo "Postgres is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Postgres did not become ready. Aborting."
+              exit 1
+            fi
+            sleep 3
+          done
+
+          # Run migrations
+          echo "Running database migrations..."
+          docker compose -f docker-compose.prod.yml run --rm migrate || {
+            echo "Migration failed! Aborting deployment."
+            exit 1
+          }
+
+          # Deploy application services
+          echo "Starting application services..."
+          docker compose -f docker-compose.prod.yml up -d --no-deps whatsapp-api whatsapp-worker whatsapp-dispatcher
+
+          # Wait for API to be healthy
+          echo "Waiting for API to be healthy..."
+          for i in {1..45}; do
+            HEALTH=$(docker inspect whatsapp-api --format='{{.State.Health.Status}}' 2>/dev/null || echo "unknown")
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "API is healthy!"
+              break
+            fi
+            if [ $i -eq 45 ]; then
+              echo "API failed to become healthy. Rolling back..."
+              docker compose -f docker-compose.prod.yml stop whatsapp-api
+              exit 1
+            fi
+            echo "Waiting... ($i/45) [status: $HEALTH]"
+            sleep 4
+          done
+
+          # Health check
+          echo "Performing health check..."
+          for i in {1..3}; do
+            if curl -f http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Health check passed!"
+              break
+            fi
+            if [ $i -eq 3 ]; then
+              echo "Health check failed after 3 attempts. Rolling back..."
+              docker compose -f docker-compose.prod.yml stop whatsapp-api
+              exit 1
+            fi
+            echo "Health check attempt $i failed, retrying..."
+            sleep 10
+          done
+
+          # Reload nginx
+          echo "Reloading nginx..."
+          sudo nginx -t && sudo systemctl reload nginx
+
+          # Clean up old images (keep last 3 per image)
+          for IMAGE in wa-api wa-worker wa-dispatcher; do
+            docker images ${IMAGE} --format "{{.ID}} {{.Tag}}" | \
+              grep -v "latest" | \
+              tail -n +4 | \
+              awk '{print $1}' | \
+              xargs -r docker rmi -f || true
+          done
+
+          # Clean up transferred files
+          rm -f /tmp/docker-images.tar.gz
+          rm -f /tmp/wa-docker-compose.prod.yml
+          rm -rf /tmp/wa-migrations
+
+          echo "=========================================="
+          echo "Deployment completed successfully!"
+          echo "Commit: ${COMMIT_SHA}"
+          echo "Time: $(date)"
+          echo "=========================================="
+          DEPLOY_SCRIPT
+
+          chmod +x /tmp/deploy.sh
+
+      - name: Transfer and execute deployment script
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" scp \
+            -o StrictHostKeyChecking=no \
+            /tmp/deploy.sh \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/wa-deploy.sh
+
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'bash /tmp/wa-deploy.sh'
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment..."
+          sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'for i in {1..5}; do
+              if curl -f http://localhost:8080/health > /dev/null 2>&1; then
+                echo "✅ Deployment verified successfully!"
+                exit 0
+              fi
+              echo "Verification attempt $i failed, retrying..."
+              sleep 5
+            done
+            echo "❌ Deployment verification failed"
+            exit 1'
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf ~/.ssh/known_hosts
+
+      - name: Create deployment summary
+        if: always()
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          COMMIT_SHA=${{ inputs.commit_sha || github.sha }}
+          SHORT_SHA=${COMMIT_SHA:0:7}
+
+          {
+            echo "## Deployment Summary"
+            echo ""
+            echo "- **Commit:** ${SHORT_SHA}"
+            echo "- **Branch:** ${{ github.ref_name }}"
+            echo "- **Status:** ${{ job.status }}"
+            echo "- **Time:** $(date)"
+            echo "- **Triggered by:** ${{ github.actor }}"
+            echo ""
+            echo "### Commit Message"
+            echo ""
+            echo '```'
+            printf '%s\n' "$COMMIT_MSG"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+
+    steps:
+      - name: Deployment Success Notification
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ Deployment succeeded!"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Actor: ${{ github.actor }}"
+
+      - name: Deployment Failure Notification
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Actor: ${{ github.actor }}"
+          exit 1
