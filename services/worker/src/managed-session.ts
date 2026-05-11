@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { type OutboundCommand, messageSendFailed, messageSentAck, newEventId } from '@wa/shared';
+import { RedisKeys, type OutboundCommand, messageSendFailed, messageSentAck, newEventId } from '@wa/shared';
 import type { Redis } from 'ioredis';
 import wwebjs from 'whatsapp-web.js';
 import { withTx } from './db.js';
@@ -75,7 +75,21 @@ export class ManagedSession {
   private wireHandlers(): void {
     const id = this.waAccountId;
     this.client.on('qr', (qr: string) => {
-      void onQr(this.redis, id, qr).catch((err) => log.error({ err, id }, 'on-qr failed'));
+      void (async () => {
+        await onQr(this.redis, id, qr).catch((err) => log.error({ err, id }, 'on-qr failed'));
+        const phone = await this.redis.get(RedisKeys.pairingPhone(id));
+        if (phone) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const code: string = await (this.client as any).requestPairingCode(phone);
+            await this.redis.set(RedisKeys.pairingCode(id), code, 'EX', RedisKeys.TTL.pairingCodeSec);
+            await this.redis.publish(RedisKeys.pairingChannel(id), JSON.stringify({ code }));
+            log.info({ wa_account_id: id, code }, 'pairing code issued');
+          } catch (err) {
+            log.error({ err, wa_account_id: id }, 'requestPairingCode failed');
+          }
+        }
+      })();
     });
     this.client.on('authenticated', () => {
       void onAuthenticated(id).catch((err) => log.error({ err, id }, 'on-authenticated failed'));

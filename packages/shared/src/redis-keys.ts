@@ -20,6 +20,10 @@ export const qrChannel = (waAccountId: string): string => `qr:${waAccountId}`;
 
 export const authFailures = (waAccountId: string): string => `auth_failures:${waAccountId}`;
 
+export const pairingPhone = (waAccountId: string): string => `pairing:phone:${waAccountId}`;
+export const pairingCode = (waAccountId: string): string => `pairing:code:${waAccountId}`;
+export const pairingChannel = (waAccountId: string): string => `pairing:channel:${waAccountId}`;
+
 // TTL constants (seconds) — kept here so we have one place to tune lease windows.
 export const TTL = {
   sessionOwnerSec: 30,
@@ -28,4 +32,6 @@ export const TTL = {
   dedupEventSec: 86_400, // 24h
   sessionQrSec: 60,
   authFailuresSec: 3_600, // 1h
+  pairingPhoneSec: 120,
+  pairingCodeSec: 120,
 } as const;

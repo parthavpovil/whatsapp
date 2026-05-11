@@ -5,6 +5,7 @@ import { getRedis } from './redis.js';
 import { registerAccounts } from './routes/accounts.js';
 import { registerCommands } from './routes/commands.js';
 import { registerHealth } from './routes/health.js';
+import { registerPairingCode } from './routes/pairing.js';
 import { registerQr } from './routes/qr.js';
 
 export type MakeAppOpts = {
@@ -41,6 +42,7 @@ export const makeApp = (opts: MakeAppOpts): FastifyInstance => {
   registerHealth(app, redis);
   registerAccounts(app, auth);
   registerQr(app, redis, auth);
+  registerPairingCode(app, redis, auth);
   registerCommands(app, auth, opts.redisUrl);
 
   return app;
