@@ -45,7 +45,11 @@ mockBackend.post('/webhooks', async (req, reply) => {
 let webhookUrl: string;
 
 beforeAll(async () => {
-  const pgUrl = process.env.TEST_DATABASE_URL!;
+  const pgUrl = process.env.TEST_DATABASE_URL;
+
+  if (!pgUrl) {
+    throw new Error('TEST_DATABASE_URL environment variable is required');
+  }
 
   getDispatcherPool(pgUrl);
 

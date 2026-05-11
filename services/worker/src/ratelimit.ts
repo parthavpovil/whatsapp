@@ -53,7 +53,7 @@ return { allowed, math.floor(tokens), retry_ms }
 `;
 
 declare module 'ioredis' {
-  interface RedisCommander<Context extends ClientContext> {
+  interface RedisCommander<Context extends ClientContext = { type: 'default' }> {
     rateLimitTake(
       key: string,
       capacity: string,

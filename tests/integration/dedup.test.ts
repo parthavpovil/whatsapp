@@ -20,8 +20,12 @@ let pool: pg.Pool;
 let redis: Redis;
 
 beforeAll(async () => {
-  const pgUrl = process.env.TEST_DATABASE_URL!;
-  const redisUrl = process.env.TEST_REDIS_URL!;
+  const pgUrl = process.env.TEST_DATABASE_URL;
+  const redisUrl = process.env.TEST_REDIS_URL;
+
+  if (!pgUrl || !redisUrl) {
+    throw new Error('TEST_DATABASE_URL and TEST_REDIS_URL environment variables are required');
+  }
 
   pool = new pg.Pool({ connectionString: pgUrl, max: 5 });
   redis = new Redis(redisUrl);
