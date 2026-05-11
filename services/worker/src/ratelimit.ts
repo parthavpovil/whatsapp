@@ -53,6 +53,7 @@ return { allowed, math.floor(tokens), retry_ms }
 `;
 
 declare module 'ioredis' {
+  // biome-ignore lint/correctness/noUnusedVariables: name must match ioredis declaration for interface merging
   interface RedisCommander<Context extends ClientContext = { type: 'default' }> {
     rateLimitTake(
       key: string,
