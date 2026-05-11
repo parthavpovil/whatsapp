@@ -182,7 +182,6 @@ jobs:
           MAX_RSS_MB=${{ secrets.MAX_RSS_MB }}
 
           LOG_LEVEL=info
-          COMMIT_SHA=${COMMIT_SHA}
           ENV_FILE
 
           chmod 600 ${DEPLOY_PATH}/.env

@@ -62,7 +62,7 @@ services:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -105,6 +105,7 @@ services:
     image: wa-dispatcher:latest
     environment:
       DATABASE_URL: postgres://wa:${POSTGRES_PASSWORD}@postgres:5432/wa_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       DISPATCHER_CONCURRENCY: ${DISPATCHER_CONCURRENCY:-4}
       DISPATCHER_HTTP_TIMEOUT_MS: ${DISPATCHER_HTTP_TIMEOUT_MS:-10000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
