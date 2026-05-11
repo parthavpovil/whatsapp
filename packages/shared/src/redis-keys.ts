@@ -32,6 +32,6 @@ export const TTL = {
   dedupEventSec: 86_400, // 24h
   sessionQrSec: 60,
   authFailuresSec: 3_600, // 1h
-  pairingPhoneSec: 120,
+  pairingPhoneSec: 300,
   pairingCodeSec: 120,
 } as const;

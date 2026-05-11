@@ -4,7 +4,7 @@ import type { Redis } from 'ioredis';
 import { query } from '../db.js';
 import { log } from '../log.js';
 
-const POLL_TIMEOUT_MS = 30_000;
+const POLL_TIMEOUT_MS = 90_000;
 const POLL_INTERVAL_MS = 500;
 
 export const registerPairingCode = (
