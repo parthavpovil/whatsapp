@@ -67,10 +67,7 @@ export class ManagedSession {
           '--disable-background-timer-throttling',
         ],
       },
-      webVersionCache: {
-        type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1017054665.html',
-      },
+      webVersionCache: { type: 'local', path: opts.webVersionCachePath },
     });
     this.wireHandlers();
   }
